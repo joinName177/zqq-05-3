@@ -24,8 +24,7 @@ import type {
   TopologyStats
 } from '../domain/TopologyModels';
 import { getRelationType } from '../data/relationTypes';
-import { averageIntervalDays, computeFrequency, groupInteractionsByPerson } from './contactFrequency';
-import { daysBetween, isValidIsoDate } from './dateUtils';
+import { averageIntervalDays, computeFrequency, countInWindow, groupInteractionsByPerson } from './contactFrequency';
 import { truncate } from './formatters';
 
 /** 按天数分级：90–119 提醒 / 120–179 警告 / ≥180 严重；未达阈值返回 null */
@@ -165,12 +164,8 @@ export function detectInsights(
   const coreAvgIntervalDays =
     coreIntervals.length > 0 ? coreIntervals.reduce((sum, value) => sum + value, 0) / coreIntervals.length : null;
 
-  const interactions30d = interactions.filter((interaction) => {
-    if (!isValidIsoDate(interaction.date)) return false;
-    const daysAgo = daysBetween(interaction.date, todayIso);
-    // BUG-05-02: the summary uses an exclusive recent window.
-    return daysAgo >= 0 && daysAgo < RECENT_WINDOW_DAYS;
-  }).length;
+  // 与连线 / 建议共用同一套「近 30 天」计数（含边界当天），避免同一边界日在不同位置结果不一致
+  const interactions30d = countInWindow(interactions, todayIso, RECENT_WINDOW_DAYS);
 
   const dormantByLevel: Record<DormancyLevel, number> = { notice: 0, warning: 0, severe: 0 };
   for (const alert of dormant) dormantByLevel[alert.level] += 1;

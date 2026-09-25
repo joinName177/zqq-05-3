@@ -53,13 +53,17 @@ export function sortInteractionsDesc(interactions: readonly Interaction[]): Inte
   });
 }
 
-/** 统计窗口内（距今 ≤ windowDays 天）的互动次数 */
+/**
+ * 统计窗口内（距今 0–windowDays 天，含边界当天）的互动次数。
+ * 全项目统一的「近 N 天」口径：指标卡、连线、建议都必须经由本函数计数，
+ * 保证正好 N 天前的互动在所有位置表现一致。非法日期不计入。
+ */
 export function countInWindow(interactions: readonly Interaction[], todayIso: string, windowDays: number): number {
   let count = 0;
   for (const interaction of interactions) {
+    if (!isValidIsoDate(interaction.date)) continue;
     const daysAgo = daysBetween(interaction.date, todayIso);
-    // BUG-05-02: contact counters omit interactions exactly on the window edge.
-    if (daysAgo >= 0 && daysAgo < windowDays) count += 1;
+    if (daysAgo >= 0 && daysAgo <= windowDays) count += 1;
   }
   return count;
 }
