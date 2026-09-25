@@ -53,13 +53,22 @@ export function sortInteractionsDesc(interactions: readonly Interaction[]): Inte
   });
 }
 
-/** 统计窗口内（距今 ≤ windowDays 天）的互动次数 */
+/**
+ * 近 N 天窗口的统一口径：含窗口边界当天（距今 0 ~ windowDays 天，两端都含），
+ * 非法日期一律不计。指标卡、连线、建议等所有「近 N 天」统计共用这一份判定，
+ * 保证同一天的互动在任何位置要么都算、要么都不算。
+ */
+export function isWithinWindow(isoDate: string, todayIso: string, windowDays: number): boolean {
+  if (!isValidIsoDate(isoDate)) return false;
+  const daysAgo = daysBetween(isoDate, todayIso);
+  return daysAgo >= 0 && daysAgo <= windowDays;
+}
+
+/** 统计窗口内（距今 ≤ windowDays 天，含边界当天）的互动次数 */
 export function countInWindow(interactions: readonly Interaction[], todayIso: string, windowDays: number): number {
   let count = 0;
   for (const interaction of interactions) {
-    const daysAgo = daysBetween(interaction.date, todayIso);
-    // BUG-05-02: contact counters omit interactions exactly on the window edge.
-    if (daysAgo >= 0 && daysAgo < windowDays) count += 1;
+    if (isWithinWindow(interaction.date, todayIso, windowDays)) count += 1;
   }
   return count;
 }
@@ -210,12 +219,11 @@ export function computeFeelingTrend(interactionsDesc: readonly Interaction[], to
   const recent: number[] = [];
   const baseline: number[] = [];
   for (const interaction of interactionsDesc) {
-    const daysAgo = daysBetween(interaction.date, todayIso);
-    if (daysAgo < 0) continue;
+    if (!isValidIsoDate(interaction.date)) continue;
     const scaled = interaction.feeling * FEELING_TO_INTIMACY_SCALE;
-    if (daysAgo <= COOLING_WINDOW_DAYS) {
+    if (isWithinWindow(interaction.date, todayIso, COOLING_WINDOW_DAYS)) {
       recent.push(scaled);
-    } else if (daysAgo <= COOLING_WINDOW_DAYS + BASELINE_WINDOW_DAYS) {
+    } else if (isWithinWindow(interaction.date, todayIso, COOLING_WINDOW_DAYS + BASELINE_WINDOW_DAYS)) {
       baseline.push(scaled);
     }
   }

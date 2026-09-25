@@ -25,7 +25,7 @@ import type { Interaction } from '../domain/InteractionModels';
 import type { AdviceContext, MaintenanceAdvice } from '../domain/TopologyModels';
 import { daysBetween, addDays, formatDisplayDate, isValidIsoDate } from './dateUtils';
 import { formatDays, formatDecimal } from './formatters';
-import { computeFeelingTrend, countInWindow, deriveLastContact } from './contactFrequency';
+import { computeFeelingTrend, countInWindow, deriveLastContact, isWithinWindow } from './contactFrequency';
 import { stableId } from './idFactory';
 
 interface AdviceSeed {
@@ -54,12 +54,11 @@ export function nextContactTierLabel(intimacy: number): string {
   return '弱连接';
 }
 
-/** 找到最近一次「冲突」互动（仅看 CONFLICT_LOOKBACK_DAYS 天内的记录） */
+/** 找到最近一次「冲突」互动（仅看 CONFLICT_LOOKBACK_DAYS 天内的记录，含边界当天） */
 function latestConflict(interactionsDesc: readonly Interaction[], todayIso: string): Interaction | null {
   for (const interaction of interactionsDesc) {
     if (interaction.kind !== 'conflict') continue;
-    const daysAgo = daysBetween(interaction.date, todayIso);
-    if (daysAgo >= 0 && daysAgo <= CONFLICT_LOOKBACK_DAYS) return interaction;
+    if (isWithinWindow(interaction.date, todayIso, CONFLICT_LOOKBACK_DAYS)) return interaction;
   }
   return null;
 }
